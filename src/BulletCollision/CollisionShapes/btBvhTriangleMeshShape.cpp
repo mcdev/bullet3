@@ -93,11 +93,16 @@ void btBvhTriangleMeshShape::performRaycast(btTriangleCallback* callback, const 
 	{
 		btStridingMeshInterface* m_meshInterface;
 		btTriangleCallback* m_callback;
+		btVector3 m_dir;
 
-		MyNodeOverlapCallback(btTriangleCallback* callback, btStridingMeshInterface* meshInterface)
+		MyNodeOverlapCallback(btTriangleCallback* callback,
+							  btStridingMeshInterface* meshInterface,
+							  const btVector3& raySource,
+							  const btVector3& rayTarget)
 			: m_meshInterface(meshInterface),
 			  m_callback(callback)
 		{
+			m_dir = rayTarget - raySource;
 		}
 
 		virtual void processNode(int nodeSubPart, int nodeTriangleIndex)
@@ -129,12 +134,20 @@ void btBvhTriangleMeshShape::performRaycast(btTriangleCallback* callback, const 
 			for (int j = 2; j >= 0; j--)
 			{
 				int graphicsindex;
-                                switch (indicestype) {
-                                        case PHY_INTEGER: graphicsindex = gfxbase[j]; break;
-                                        case PHY_SHORT: graphicsindex = ((unsigned short*)gfxbase)[j]; break;
-                                        case PHY_UCHAR: graphicsindex = ((unsigned char*)gfxbase)[j]; break;
-                                        default: btAssert(0);
-                                }
+				switch (indicestype)
+				{
+					case PHY_INTEGER:
+						graphicsindex = gfxbase[j];
+						break;
+					case PHY_SHORT:
+						graphicsindex = ((unsigned short*)gfxbase)[j];
+						break;
+					case PHY_UCHAR:
+						graphicsindex = ((unsigned char*)gfxbase)[j];
+						break;
+					default:
+						btAssert(0);
+				}
 
 				if (type == PHY_FLOAT)
 				{
@@ -150,13 +163,18 @@ void btBvhTriangleMeshShape::performRaycast(btTriangleCallback* callback, const 
 				}
 			}
 
-			/* Perform ray vs. triangle collision here */
-			m_callback->processTriangle(m_triangle, nodeSubPart, nodeTriangleIndex);
-			m_meshInterface->unLockReadOnlyVertexBase(nodeSubPart);
+			// Reject back facing triangles from the the ray test.
+			btVector3 triangle_dir = (m_triangle[1] - m_triangle[0]).cross(m_triangle[2] - m_triangle[0]);
+			if (m_dir.dot(triangle_dir) > 0.0)
+			{
+				/* Perform ray vs. triangle collision here */
+				m_callback->processTriangle(m_triangle, nodeSubPart, nodeTriangleIndex);
+				m_meshInterface->unLockReadOnlyVertexBase(nodeSubPart);
+			}
 		}
 	};
 
-	MyNodeOverlapCallback myNodeCallback(callback, m_meshInterface);
+	MyNodeOverlapCallback myNodeCallback(callback, m_meshInterface, raySource, rayTarget);
 
 	m_bvh->reportRayOverlappingNodex(&myNodeCallback, raySource, rayTarget);
 }
@@ -167,11 +185,16 @@ void btBvhTriangleMeshShape::performConvexcast(btTriangleCallback* callback, con
 	{
 		btStridingMeshInterface* m_meshInterface;
 		btTriangleCallback* m_callback;
+		btVector3 m_dir;
 
-		MyNodeOverlapCallback(btTriangleCallback* callback, btStridingMeshInterface* meshInterface)
+		MyNodeOverlapCallback(btTriangleCallback* callback,
+							  btStridingMeshInterface* meshInterface,
+							  const btVector3& raySource,
+							  const btVector3& rayTarget)
 			: m_meshInterface(meshInterface),
 			  m_callback(callback)
 		{
+			m_dir = rayTarget - raySource;
 		}
 
 		virtual void processNode(int nodeSubPart, int nodeTriangleIndex)
@@ -203,12 +226,20 @@ void btBvhTriangleMeshShape::performConvexcast(btTriangleCallback* callback, con
 			for (int j = 2; j >= 0; j--)
 			{
 				int graphicsindex;
-                                switch (indicestype) {
-                                        case PHY_INTEGER: graphicsindex = gfxbase[j]; break;
-                                        case PHY_SHORT: graphicsindex = ((unsigned short*)gfxbase)[j]; break;
-                                        case PHY_UCHAR: graphicsindex = ((unsigned char*)gfxbase)[j]; break;
-                                        default: btAssert(0);
-                                }
+				switch (indicestype)
+				{
+					case PHY_INTEGER:
+						graphicsindex = gfxbase[j];
+						break;
+					case PHY_SHORT:
+						graphicsindex = ((unsigned short*)gfxbase)[j];
+						break;
+					case PHY_UCHAR:
+						graphicsindex = ((unsigned char*)gfxbase)[j];
+						break;
+					default:
+						btAssert(0);
+				}
 
 				if (type == PHY_FLOAT)
 				{
@@ -224,13 +255,19 @@ void btBvhTriangleMeshShape::performConvexcast(btTriangleCallback* callback, con
 				}
 			}
 
-			/* Perform ray vs. triangle collision here */
-			m_callback->processTriangle(m_triangle, nodeSubPart, nodeTriangleIndex);
-			m_meshInterface->unLockReadOnlyVertexBase(nodeSubPart);
+			btVector3 triangle_dir = (m_triangle[1] - m_triangle[0]).cross(m_triangle[2] - m_triangle[0]);
+
+			// Reject back facing triangles from the the ray test.
+			if (m_dir.dot(triangle_dir) > 0.0)
+			{
+				/* Perform ray vs. triangle collision here */
+				m_callback->processTriangle(m_triangle, nodeSubPart, nodeTriangleIndex);
+				m_meshInterface->unLockReadOnlyVertexBase(nodeSubPart);
+			}
 		}
 	};
 
-	MyNodeOverlapCallback myNodeCallback(callback, m_meshInterface);
+	MyNodeOverlapCallback myNodeCallback(callback, m_meshInterface, raySource, rayTarget);
 
 	m_bvh->reportBoxCastOverlappingNodex(&myNodeCallback, raySource, rayTarget, aabbMin, aabbMax);
 }
